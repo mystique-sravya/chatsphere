@@ -4,9 +4,11 @@ import { useChatStore } from '../stores/chatStore';
 import { useFriendStore } from '../stores/friendStore';
 import type { WSMessage } from '../types';
 import { emitVoiceSocketEvent } from '../lib/voiceEvents';
+import { decryptMessage } from '../lib/crypto';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingQueue = useRef<Record<string, unknown>[]>([]);
   const token = useAuthStore((s) => s.token);
   const addMessage = useChatStore((s) => s.addMessage);
   const setTypingUser = useChatStore((s) => s.setTypingUser);
@@ -32,20 +34,32 @@ export function useWebSocket() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onmessage = (event) => {
+    ws.onopen = () => {
+      // Flush any messages queued while disconnected
+      while (pendingQueue.current.length > 0) {
+        const msg = pendingQueue.current.shift()!;
+        ws.send(JSON.stringify(msg));
+      }
+    };
+
+    ws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
 
       switch (data.type) {
-        case 'message':
+        case 'message': {
+          const content = await decryptMessage(data.room_id, data.content);
+          const replyContent = data.reply_content
+            ? await decryptMessage(data.room_id, data.reply_content)
+            : data.reply_content;
           addMessage({
             id: data.id,
             room_id: data.room_id,
             sender_id: data.sender_id,
             sender_username: data.sender_username,
             sender_avatar: data.sender_avatar,
-            content: data.content,
+            content,
             reply_to_id: data.reply_to_id,
-            reply_content: data.reply_content,
+            reply_content: replyContent,
             reply_sender_username: data.reply_sender_username,
             reactions: data.reactions,
             status: data.status,
@@ -55,6 +69,7 @@ export function useWebSocket() {
             useChatStore.getState().markRoomUnread(data.room_id);
           }
           break;
+        }
 
         case 'typing':
           setTypingUser(data.user_id, data.username);
@@ -156,6 +171,9 @@ export function useWebSocket() {
   const send = useCallback((data: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(data));
+    } else if (data.type === 'message') {
+      // Queue messages to send when reconnected
+      pendingQueue.current.push(data);
     }
   }, []);
 

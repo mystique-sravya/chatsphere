@@ -2,12 +2,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Menu, Users, Trash2, DoorOpen, MoreVertical, Check, CheckCheck, Link2, Timer,
-  Reply, Smile, X, Search, Phone, PhoneOff, Mic, MicOff,
+  Reply, Smile, X, Search, Phone, PhoneOff, Mic, MicOff, Shield,
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
+import { encryptMessage, hasRoomKey, generateRoomKey } from '../lib/crypto';
 import { formatTime, getRoomAvatar, getConversationDisplayName, getParticipantLabel } from '../lib/utils';
 import type { Message } from '../types';
 import { useDmVoiceCall } from '../hooks/useDmVoiceCall';
@@ -54,6 +55,10 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
 
   useEffect(() => {
     if (currentRoom) {
+      // Auto-enable E2E: generate key if none exists
+      if (!hasRoomKey(currentRoom.id)) {
+        generateRoomKey(currentRoom.id);
+      }
       loadMessages(currentRoom.id);
       setMessageSearch('');
       setSearchedMessages([]);
@@ -112,9 +117,10 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
     }, 2000);
   }, [currentRoom?.id, user.username, ws]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || !currentRoom) return;
-    ws.sendMessage(currentRoom.id, input.trim(), replyingTo?.id);
+    const content = await encryptMessage(currentRoom.id, input.trim());
+    ws.sendMessage(currentRoom.id, content, replyingTo?.id);
     ws.sendStopTyping(currentRoom.id);
     setInput('');
     setReplyingTo(null);
@@ -266,6 +272,9 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
           <h2 className="font-semibold truncate">{getConversationDisplayName(currentRoom, user.id)}</h2>
           <div className="text-xs opacity-50 flex flex-wrap items-center gap-2">
             <span>{activeRoomUsers.length} active &middot; {getParticipantLabel(currentRoom)}</span>
+            <span className="rounded-full px-2 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 flex items-center gap-1">
+              <Shield className="w-3 h-3" /> Encrypted
+            </span>
             {currentRoom.type === 'dm' && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] ${voiceChipClassName}`}>
                 {voiceCall.isInCall

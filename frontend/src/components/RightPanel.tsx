@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Users, Star, StarOff, UserPlus, UserMinus, Search, Check, XIcon, Bell, Clock, UserCheck, MessageCircle, Ban,
+  X, Users, Star, StarOff, UserPlus, UserMinus, Search, Check, XIcon, Bell, Clock, UserCheck, MessageCircle, Ban, MoreVertical,
 } from 'lucide-react';
 import { useChatStore } from '../stores/chatStore';
 import { useFriendStore } from '../stores/friendStore';
@@ -22,7 +22,7 @@ export default function RightPanel({ type, onClose, ws }: RightPanelProps) {
       initial={{ x: 50, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 50, opacity: 0 }}
-      className="fixed right-0 top-0 z-50 h-screen w-screen max-w-[92vw] glass border-l border-white/10 flex flex-col sm:max-w-80 lg:static lg:z-auto lg:w-80"
+      className="fixed right-0 top-0 z-50 h-[100dvh] w-screen max-w-[92vw] glass border-l border-white/10 flex flex-col sm:max-w-80 lg:static lg:z-auto lg:w-80"
     >
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <h3 className="font-semibold">{type === 'members' ? 'Chat Participants' : 'Friends'}</h3>
@@ -416,6 +416,19 @@ function FriendItem({
   onStartDm: (id: string) => void;
   onBlock: (id: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, [menuOpen]);
+
   return (
     <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 group">
       <div className="relative">
@@ -438,7 +451,9 @@ function FriendItem({
           {friend.status === 'online' ? 'Online' : `Last seen ${formatDate(friend.last_seen)}`}
         </p>
       </div>
-      <div className="flex gap-1 lg:hidden lg:group-hover:flex">
+
+      {/* Desktop: inline hover-reveal buttons */}
+      <div className="hidden lg:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onStartDm(friend.user_id)}
           className="p-1 hover:bg-primary-500/20 rounded-lg text-primary-400"
@@ -469,6 +484,48 @@ function FriendItem({
         >
           <Ban className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Mobile: three-dot menu */}
+      <div className="relative lg:hidden" ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="p-1.5 hover:bg-white/10 rounded-lg"
+        >
+          <MoreVertical className="w-4 h-4 opacity-60" />
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-full mt-1 w-40 py-1 glass rounded-xl border border-white/10 shadow-xl z-50">
+            <button
+              onClick={() => { onStartDm(friend.user_id); setMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-white/10 text-primary-400"
+            >
+              <MessageCircle className="w-4 h-4" /> Message
+            </button>
+            <button
+              onClick={() => { onToggleFav(friend.user_id, !friend.is_favorite); setMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-white/10"
+            >
+              {friend.is_favorite ? (
+                <><Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> Unfavorite</>
+              ) : (
+                <><StarOff className="w-4 h-4 opacity-60" /> Favorite</>
+              )}
+            </button>
+            <button
+              onClick={() => { onRemove(friend.user_id); setMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-white/10 text-red-400"
+            >
+              <UserMinus className="w-4 h-4" /> Remove
+            </button>
+            <button
+              onClick={() => { onBlock(friend.user_id); setMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-white/10 text-red-400"
+            >
+              <Ban className="w-4 h-4" /> Block
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
