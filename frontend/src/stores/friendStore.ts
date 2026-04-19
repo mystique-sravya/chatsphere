@@ -16,6 +16,7 @@ interface FriendState {
   toggleFavorite: (friendId: string, isFavorite: boolean) => Promise<void>;
   removeFriend: (friendId: string) => Promise<void>;
   handleFriendRemoved: (userId: string) => void;
+  updateFriendStatus: (userId: string, status: 'online' | 'offline') => void;
 }
 
 export const useFriendStore = create<FriendState>((set, get) => ({
@@ -70,5 +71,15 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
   handleFriendRemoved: (userId) => {
     set((s) => ({ friends: s.friends.filter((f) => f.user_id !== userId) }));
+  },
+
+  updateFriendStatus: (userId, status) => {
+    set((s) => ({
+      friends: s.friends.map((f) =>
+        f.user_id === userId
+          ? { ...f, status, ...(status === 'offline' ? { last_seen: new Date().toISOString() } : {}) }
+          : f
+      ),
+    }));
   },
 }));

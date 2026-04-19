@@ -438,7 +438,7 @@ function FriendItem({
           {friend.status === 'online' ? 'Online' : `Last seen ${formatDate(friend.last_seen)}`}
         </p>
       </div>
-      <div className="hidden group-hover:flex gap-1">
+      <div className="flex gap-1 lg:hidden lg:group-hover:flex">
         <button
           onClick={() => onStartDm(friend.user_id)}
           className="p-1 hover:bg-primary-500/20 rounded-lg text-primary-400"

@@ -48,7 +48,7 @@ export default function ChatPage() {
   }, [currentRoom?.id]);
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-[100dvh] flex overflow-hidden">
       {/* Mobile sidebar overlay */}
       {mobileSidebar && currentRoom && (
         <div

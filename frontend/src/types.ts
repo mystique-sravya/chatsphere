@@ -124,6 +124,8 @@ export type WSMessage =
   | { type: 'friend_removed'; user_id: string }
   | { type: 'friend_request_accepted'; user_id: string; username: string }
   | { type: 'incoming_friend_request'; from_user_id: string; from_username: string }
+  | { type: 'user_online'; user_id: string }
+  | { type: 'user_offline'; user_id: string }
   | { type: 'room_added'; room: Room }
   | { type: 'room_deleted'; room_id: string }
   | { type: 'room_users'; room_id: string; users: string[] }

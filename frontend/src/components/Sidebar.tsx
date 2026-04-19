@@ -20,7 +20,7 @@ interface SidebarProps {
 export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, onToggleFriends, onJoinPublicRoom, onExploreRooms }: SidebarProps) {
   const user = useAuthStore((s) => s.user)!;
   const logout = useAuthStore((s) => s.logout);
-  const { rooms, currentRoom, unreadRooms } = useChatStore();
+  const { rooms, currentRoom, unreadRooms, roomsLoading } = useChatStore();
   const { requests } = useFriendStore();
 
   const getRoomIcon = (type: string) => {
@@ -33,7 +33,7 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
   };
 
   return (
-    <div className="h-screen w-screen lg:w-72 glass flex flex-col border-r border-white/10">
+    <div className="h-[100dvh] w-screen lg:w-72 glass flex flex-col border-r border-white/10">
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -87,6 +87,19 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {roomsLoading && rooms.length === 0 && (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
+                <div className="w-10 h-10 rounded-2xl bg-white/10" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-white/10 rounded w-2/3" />
+                  <div className="h-2 bg-white/10 rounded w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {rooms.map((room) => (
           <motion.button
             key={room.id}
@@ -129,7 +142,7 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
           </motion.button>
         ))}
 
-        {rooms.length === 0 && (
+        {rooms.length === 0 && !roomsLoading && (
           <div className="text-center py-8 opacity-40">
             <MessageCircle className="w-8 h-8 mx-auto mb-2" />
             <p className="text-sm">No chats yet</p>

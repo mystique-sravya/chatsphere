@@ -86,6 +86,14 @@ export function useWebSocket() {
           useFriendStore.getState().handleFriendRemoved(data.user_id);
           break;
 
+        case 'user_online':
+          useFriendStore.getState().updateFriendStatus(data.user_id, 'online');
+          break;
+
+        case 'user_offline':
+          useFriendStore.getState().updateFriendStatus(data.user_id, 'offline');
+          break;
+
         case 'friend_request_accepted':
           useFriendStore.getState().loadFriends();
           useFriendStore.getState().loadSentRequests();

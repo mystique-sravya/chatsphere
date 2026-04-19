@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 
 interface ChatState {
   rooms: Room[];
+  roomsLoading: boolean;
   currentRoom: Room | null;
   messages: Message[];
   messagesByRoom: Record<string, Message[]>;
@@ -31,6 +32,7 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   rooms: [],
+  roomsLoading: true,
   currentRoom: null,
   messages: [],
   messagesByRoom: {},
@@ -39,6 +41,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeRoomUsers: [],
 
   loadRooms: async () => {
+    set({ roomsLoading: true });
     const rooms = await api.listRooms() as Room[];
     const currentRoomId = get().currentRoom?.id;
     const unread: Record<string, boolean> = { ...get().unreadRooms };
@@ -47,10 +50,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         unread[room.id] = true;
       }
     }
-    set({ rooms, unreadRooms: unread });
+    set({ rooms, unreadRooms: unread, roomsLoading: false });
   },
 
   loadMyRooms: async () => {
+    set({ roomsLoading: true });
     const rooms = await api.myRooms() as Room[];
     const currentRoomId = get().currentRoom?.id;
     const unread: Record<string, boolean> = { ...get().unreadRooms };
@@ -59,7 +63,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         unread[room.id] = true;
       }
     }
-    set({ rooms, unreadRooms: unread });
+    set({ rooms, unreadRooms: unread, roomsLoading: false });
   },
 
   setCurrentRoom: (room) => set((state) => {
@@ -114,7 +118,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   createRoom: async (name, type, memberIds = []) => {
     const room = await api.createRoom({ name, type, member_ids: memberIds }) as Room;
-    set((s) => ({ rooms: [room, ...s.rooms] }));
+    set((s) => {
+      const exists = s.rooms.some((r) => r.id === room.id);
+      return { rooms: exists ? s.rooms : [room, ...s.rooms] };
+    });
     return room;
   },
 

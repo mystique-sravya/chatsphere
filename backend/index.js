@@ -254,19 +254,16 @@ async function listAccessibleRooms(userId, mineOnly = false) {
         [userId]
       );
 
-  // Batch-fetch latest activity timestamp per room
+  // Batch-fetch latest activity timestamp per room (only messages from OTHER users)
   const roomIds = rows.map((r) => r.id);
   let latestActivityMap = {};
   if (roomIds.length > 0) {
     const activityRows = await query(
       `SELECT room_id, MAX(created_at) AS latest_at
-       FROM (
-         SELECT m.room_id, m.created_at FROM ${TABLES.messages} m WHERE m.room_id = ANY($1::text[])
-         UNION ALL
-         SELECT m.room_id, r.created_at FROM ${TABLES.reactions} r JOIN ${TABLES.messages} m ON m.id = r.message_id WHERE m.room_id = ANY($1::text[])
-       ) sub
+       FROM ${TABLES.messages} m
+       WHERE m.room_id = ANY($1::text[]) AND m.sender_id != $2
        GROUP BY room_id`,
-      [roomIds]
+      [roomIds, userId]
     );
     for (const ar of activityRows) {
       latestActivityMap[ar.room_id] = ar.latest_at;
@@ -335,6 +332,21 @@ async function updatePresence(userId, status) {
     `UPDATE ${TABLES.users} SET status = $2, last_seen = NOW() WHERE id = $1`,
     [userId, status]
   );
+}
+
+async function broadcastPresenceToFriends(userId, status) {
+  const friends = await query(
+    `SELECT friend_id FROM ${TABLES.friendships} WHERE user_id = $1`,
+    [userId]
+  );
+  const payload = JSON.stringify({ type: status === 'online' ? 'user_online' : 'user_offline', user_id: userId });
+  for (const { friend_id } of friends) {
+    const sockets = activeSockets.get(friend_id);
+    if (!sockets) continue;
+    for (const s of sockets) {
+      if (s.readyState === 1) s.send(payload);
+    }
+  }
 }
 
 function authMiddleware(req, res, next) {
@@ -1573,7 +1585,7 @@ wss.on('connection', (ws) => {
   const sockets = activeSockets.get(ws.user.id) || new Set();
   sockets.add(ws);
   activeSockets.set(ws.user.id, sockets);
-  updatePresence(ws.user.id, 'online').catch(console.error);
+  updatePresence(ws.user.id, 'online').then(() => broadcastPresenceToFriends(ws.user.id, 'online')).catch(console.error);
 
   ws.on('message', async (raw) => {
     try {
@@ -1725,6 +1737,11 @@ wss.on('connection', (ws) => {
            RETURNING *`,
           [uuidv4(), data.room_id, ws.user.id, String(data.content).trim(), replyToId]
         );
+        // Keep sender's last_read_at current so own messages don't trigger unread
+        await query(
+          `UPDATE ${TABLES.roomMembers} SET last_read_at = NOW() WHERE room_id = $1 AND user_id = $2`,
+          [data.room_id, ws.user.id]
+        );
         await sendToRoomMembers(data.room_id, {
           type: 'message',
           id: message.id,
@@ -1759,6 +1776,7 @@ wss.on('connection', (ws) => {
       if (sockets.size === 0) {
         activeSockets.delete(ws.user.id);
         await updatePresence(ws.user.id, 'offline');
+        broadcastPresenceToFriends(ws.user.id, 'offline').catch(console.error);
       }
     }
   });

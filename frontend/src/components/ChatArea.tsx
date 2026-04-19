@@ -39,6 +39,7 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
   const [messageSearch, setMessageSearch] = useState('');
   const [searchedMessages, setSearchedMessages] = useState<Message[]>([]);
   const [searchingMessages, setSearchingMessages] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionPickerMsgId, setReactionPickerMsgId] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
       loadMessages(currentRoom.id);
       setMessageSearch('');
       setSearchedMessages([]);
+      setShowSearch(false);
     }
   }, [currentRoom?.id, loadMessages]);
 
@@ -197,6 +199,12 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
 
   const chatMenuItems = (
     <>
+      <button
+        onClick={() => { setShowSearch(!showSearch); setShowMenu(false); }}
+        className="w-full flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 text-sm"
+      >
+        <Search className="w-4 h-4" /> {showSearch ? 'Hide Search' : 'Search Messages'}
+      </button>
       {currentRoom.type !== 'dm' && (
         <button
           onClick={() => { leaveRoom(currentRoom.id); setShowMenu(false); }}
@@ -243,7 +251,7 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
   );
 
   return (
-    <div className="flex-1 flex flex-col h-screen min-w-0">
+    <div className="flex-1 flex flex-col h-[100dvh] min-w-0">
       {/* Header */}
       <div className="glass border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <button onClick={onMenuClick} className="lg:hidden p-2 hover:bg-white/10 rounded-xl">
@@ -341,9 +349,9 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
         </div>
       </div>
 
-      <div className="px-4 py-3 border-b border-white/5">
-        {currentRoom.type === 'dm' && (voiceCall.error || voiceCall.isInCall || voiceCall.remoteInCall) && (
-          <div className={`mb-3 rounded-2xl border px-3 py-2 text-sm ${voiceBannerClassName}`}>
+      {currentRoom.type === 'dm' && (voiceCall.error || voiceCall.isInCall || voiceCall.remoteInCall) && (
+        <div className="px-4 py-3 border-b border-white/5">
+          <div className={`rounded-2xl border px-3 py-2 text-sm ${voiceBannerClassName}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium">
                 {voiceBannerText}
@@ -359,33 +367,39 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
               )}
             </div>
           </div>
-        )}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />
-          <input
-            type="text"
-            value={messageSearch}
-            onChange={(e) => setMessageSearch(e.target.value)}
-            placeholder="Search messages in this chat"
-            className="glass-input !pl-10 pr-10 text-sm"
-          />
-          {messageSearch && (
-            <button
-              onClick={() => setMessageSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
-        <div className="mt-2 text-xs opacity-40">
-          {showingSearchResults
-            ? searchingMessages
-              ? 'Searching messages...'
-              : `${searchedMessages.length} matching message${searchedMessages.length === 1 ? '' : 's'}`
-            : 'Type at least 2 characters to search this conversation'}
+      )}
+
+      {showSearch && (
+        <div className="px-4 py-3 border-b border-white/5">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />
+            <input
+              type="text"
+              value={messageSearch}
+              onChange={(e) => setMessageSearch(e.target.value)}
+              placeholder="Search messages in this chat"
+              className="glass-input !pl-10 pr-10 text-sm"
+              autoFocus
+            />
+            {messageSearch && (
+              <button
+                onClick={() => setMessageSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="mt-2 text-xs opacity-40">
+            {showingSearchResults
+              ? searchingMessages
+                ? 'Searching messages...'
+                : `${searchedMessages.length} matching message${searchedMessages.length === 1 ? '' : 's'}`
+              : 'Type at least 2 characters to search this conversation'}
+          </div>
         </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {showMenu && (
