@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.light {
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  @apply min-h-screen transition-colors duration-300;
+}
+
+body.dark {
+  @apply bg-gradient-to-br from-gray-900 via-slate-900 to-indigo-950 text-white;
+}
+
+body.light {
+  @apply bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 text-gray-900;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  @apply glass rounded-2xl;
+}
+
+.glass-input {
+  @apply glass rounded-xl px-4 py-3 w-full outline-none
+    focus:ring-2 focus:ring-primary-500/50 transition-all duration-200;
+}
+
+.dark .glass-input {
+  @apply text-white placeholder-gray-400;
+}
+
+.light .glass-input {
+  @apply text-gray-900 placeholder-gray-500 bg-white/60;
+}
+
+.glass-button {
+  @apply px-6 py-3 rounded-xl font-medium transition-all duration-200
+    bg-primary-500 hover:bg-primary-600 text-white
+    shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40
+    active:scale-[0.98];
+}
+
+.glass-button-secondary {
+  @apply glass px-6 py-3 rounded-xl font-medium transition-all duration-200
+    hover:bg-white/20 active:scale-[0.98];
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600/40 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500/60;
+}
+
+/* Online indicator animation */
+.online-dot {
+  @apply w-3 h-3 rounded-full bg-green-500 relative;
+}
+
+.online-dot::after {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-green-500 animate-ping;
+}

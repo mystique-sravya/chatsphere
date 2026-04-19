@@ -1,0 +1,25 @@
+# Secrets & credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.crt
+*.key
+*.p12
+*.jks
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# Build artifacts
+tsconfig.tsbuildinfo
