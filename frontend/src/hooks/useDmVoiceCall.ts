@@ -196,7 +196,7 @@ export function useDmVoiceCall(room: Room | null, userId: string, ws: VoiceWsApi
             await peerConnection.setRemoteDescription(new RTCSessionDescription(event.sdp));
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
-            ws.sendVoiceAnswer(room.id, otherParticipantId, answer);
+            ws.sendVoiceAnswer(room.id, otherParticipantId!, answer);
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Unable to answer the voice call');
           }
