@@ -18,8 +18,18 @@ export function useWebSocket() {
   useEffect(() => {
     if (!token) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${token}`);
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    let wsUrl: string;
+    if (apiUrl) {
+      // Production: connect to the Render backend
+      const wsBase = apiUrl.replace(/^http/, 'ws');
+      wsUrl = `${wsBase}/ws/${token}`;
+    } else {
+      // Dev: use Vite proxy on same host
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws/${token}`;
+    }
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {

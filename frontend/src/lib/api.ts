@@ -1,4 +1,4 @@
-const BASE = '';
+const BASE = import.meta.env.VITE_API_URL || '';
 
 // We need a way to get the current token without importing the store directly
 // (to avoid circular imports). The authStore sets this after login/load.
