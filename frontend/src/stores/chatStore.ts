@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { Room, Message } from '../types';
 import { api } from '../lib/api';
-import { decryptMessage } from '../lib/crypto';
 
 interface ChatState {
   rooms: Room[];
@@ -88,14 +87,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   }),
 
   loadMessages: async (roomId) => {
-    const rawMessages = await api.getMessages(roomId) as Message[];
-    const messages = await Promise.all(
-      rawMessages.map(async (m) => ({
-        ...m,
-        content: await decryptMessage(roomId, m.content),
-        reply_content: m.reply_content ? await decryptMessage(roomId, m.reply_content) : m.reply_content,
-      }))
-    );
+    const messages = await api.getMessages(roomId) as Message[];
     set((state) => ({
       messages,
       unreadRooms: {

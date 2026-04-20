@@ -4,7 +4,6 @@ import { useChatStore } from '../stores/chatStore';
 import { useFriendStore } from '../stores/friendStore';
 import type { WSMessage } from '../types';
 import { emitVoiceSocketEvent } from '../lib/voiceEvents';
-import { decryptMessage } from '../lib/crypto';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -42,24 +41,20 @@ export function useWebSocket() {
       }
     };
 
-    ws.onmessage = async (event) => {
+    ws.onmessage = (event) => {
       const data: WSMessage = JSON.parse(event.data);
 
       switch (data.type) {
         case 'message': {
-          const content = await decryptMessage(data.room_id, data.content);
-          const replyContent = data.reply_content
-            ? await decryptMessage(data.room_id, data.reply_content)
-            : data.reply_content;
           addMessage({
             id: data.id,
             room_id: data.room_id,
             sender_id: data.sender_id,
             sender_username: data.sender_username,
             sender_avatar: data.sender_avatar,
-            content,
+            content: data.content,
             reply_to_id: data.reply_to_id,
-            reply_content: replyContent,
+            reply_content: data.reply_content,
             reply_sender_username: data.reply_sender_username,
             reactions: data.reactions,
             status: data.status,

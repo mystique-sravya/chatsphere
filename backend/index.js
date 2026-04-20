@@ -209,6 +209,93 @@ function generateInviteCode() {
   return crypto.randomBytes(6).toString('base64url'); // 8-char URL-safe code
 }
 
+// ── Encryption at rest: RSA + AES-256-GCM ──────────────────────────────────
+
+let rsaPublicKey;
+let rsaPrivateKey;
+
+function initEncryptionKeys() {
+  if (process.env.RSA_PRIVATE_KEY && process.env.RSA_PUBLIC_KEY) {
+    rsaPrivateKey = process.env.RSA_PRIVATE_KEY.replace(/\\n/g, '\n');
+    rsaPublicKey = process.env.RSA_PUBLIC_KEY.replace(/\\n/g, '\n');
+  } else {
+    // Auto-generate RSA keypair for development / first run
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    rsaPublicKey = publicKey;
+    rsaPrivateKey = privateKey;
+    console.log('⚠️  Auto-generated RSA keypair (set RSA_PRIVATE_KEY & RSA_PUBLIC_KEY env vars for persistence)');
+  }
+}
+
+function generateEncryptedRoomKey() {
+  const aesKey = crypto.randomBytes(32); // AES-256
+  const encrypted = crypto.publicEncrypt(
+    { key: rsaPublicKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+    aesKey
+  );
+  return encrypted.toString('base64');
+}
+
+function decryptRoomKey(encryptedKeyB64) {
+  const encrypted = Buffer.from(encryptedKeyB64, 'base64');
+  return crypto.privateDecrypt(
+    { key: rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+    encrypted
+  );
+}
+
+function encryptContent(aesKeyBuf, plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', aesKeyBuf, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  // Format: base64(iv + authTag + ciphertext)
+  return Buffer.concat([iv, authTag, encrypted]).toString('base64');
+}
+
+function decryptContent(aesKeyBuf, ciphertextB64) {
+  try {
+    const buf = Buffer.from(ciphertextB64, 'base64');
+    const iv = buf.subarray(0, 12);
+    const authTag = buf.subarray(12, 28);
+    const ciphertext = buf.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuf, iv);
+    decipher.setAuthTag(authTag);
+    return decipher.update(ciphertext) + decipher.final('utf8');
+  } catch {
+    // If decryption fails (e.g. old unencrypted message), return as-is
+    return ciphertextB64;
+  }
+}
+
+// Cache decrypted AES keys in memory to avoid RSA decryption on every message
+const roomKeyCache = new Map();
+
+async function getRoomAesKey(roomId) {
+  if (roomKeyCache.has(roomId)) return roomKeyCache.get(roomId);
+  const room = await queryOne(`SELECT encryption_key FROM ${TABLES.rooms} WHERE id = $1`, [roomId]);
+  if (!room?.encryption_key) return null;
+  const aesKey = decryptRoomKey(room.encryption_key);
+  roomKeyCache.set(roomId, aesKey);
+  return aesKey;
+}
+
+async function encryptMessageContent(roomId, plaintext) {
+  const aesKey = await getRoomAesKey(roomId);
+  if (!aesKey) return plaintext; // No encryption key — store plain
+  return encryptContent(aesKey, plaintext);
+}
+
+async function decryptMessageContent(roomId, ciphertext) {
+  const aesKey = await getRoomAesKey(roomId);
+  if (!aesKey) return ciphertext;
+  return decryptContent(aesKey, ciphertext);
+}
+
 async function buildRoomResponse(roomRow, includeMembers = false) {
   const memberCountRow = await queryOne(
     `SELECT COUNT(*)::int AS count FROM ${TABLES.roomMembers} WHERE room_id = $1`,
@@ -890,11 +977,12 @@ app.post('/api/rooms', authMiddleware, requireUser, asyncHandler(async (req, res
 
     const roomId = uuidv4();
     const inviteCode = generateInviteCode();
+    const encryptionKey = generateEncryptedRoomKey();
     const room = await queryOne(
-      `INSERT INTO ${TABLES.rooms} (id, name, type, created_by, is_private, invite_code)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO ${TABLES.rooms} (id, name, type, created_by, is_private, invite_code, encryption_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [roomId, name, type, req.user.id, type !== 'public', inviteCode]
+      [roomId, name, type, req.user.id, type !== 'public', inviteCode, encryptionKey]
     );
 
     await query(
@@ -1223,20 +1311,22 @@ app.get('/api/messages/:roomId', authMiddleware, requireUser, asyncHandler(async
     }
   }
 
-  res.json(rows.reverse().map((row) => ({
+  const roomId = req.params.roomId;
+  const decryptedRows = await Promise.all(rows.reverse().map(async (row) => ({
     id: row.id,
     room_id: row.room_id,
     sender_id: row.sender_id,
     sender_username: row.sender_username,
     sender_avatar: row.sender_avatar,
-    content: row.content,
+    content: await decryptMessageContent(roomId, row.content),
     reply_to_id: row.reply_to_id || null,
-    reply_content: row.reply_content || null,
+    reply_content: row.reply_content ? await decryptMessageContent(roomId, row.reply_content) : null,
     reply_sender_username: row.reply_sender_username || null,
     reactions: reactionsByMsg[row.id] || [],
     status: row.status,
     created_at: row.created_at,
   })));
+  res.json(decryptedRows);
 }));
 
 app.get('/api/messages/:roomId/search', authMiddleware, requireUser, asyncHandler(async (req, res) => {
@@ -1251,6 +1341,7 @@ app.get('/api/messages/:roomId/search', authMiddleware, requireUser, asyncHandle
   }
 
   const limit = Math.min(Number(req.query.limit || 50), 100);
+  // Fetch recent messages and filter after decryption (ILIKE can't search ciphertext)
   const rows = await query(
     `SELECT m.*, u.username AS sender_username, u.avatar_url AS sender_avatar,
             rm.content AS reply_content, rm.sender_id AS reply_sender_id,
@@ -1259,13 +1350,26 @@ app.get('/api/messages/:roomId/search', authMiddleware, requireUser, asyncHandle
      JOIN ${TABLES.users} u ON u.id = m.sender_id
      LEFT JOIN ${TABLES.messages} rm ON rm.id = m.reply_to_id
      LEFT JOIN ${TABLES.users} ru ON ru.id = rm.sender_id
-     WHERE m.room_id = $1 AND m.content ILIKE $2
+     WHERE m.room_id = $1
      ORDER BY m.created_at DESC
-     LIMIT $3`,
-    [req.params.roomId, `%${term}%`, limit]
+     LIMIT 500`,
+    [req.params.roomId]
   );
 
-  const messageIds = rows.map((row) => row.id);
+  // Decrypt and filter by search term
+  const termLower = term.toLowerCase();
+  const searchRoomId = req.params.roomId;
+  const matched = [];
+  for (const row of rows) {
+    const plaintext = await decryptMessageContent(searchRoomId, row.content);
+    if (plaintext.toLowerCase().includes(termLower)) {
+      row._decryptedContent = plaintext;
+      matched.push(row);
+      if (matched.length >= limit) break;
+    }
+  }
+
+  const messageIds = matched.map((row) => row.id);
   let reactionsByMsg = {};
   if (messageIds.length > 0) {
     const reactionRows = await query(
@@ -1288,20 +1392,21 @@ app.get('/api/messages/:roomId/search', authMiddleware, requireUser, asyncHandle
     }
   }
 
-  res.json(rows.reverse().map((row) => ({
+  const decryptedSearchResults = await Promise.all(matched.reverse().map(async (row) => ({
     id: row.id,
     room_id: row.room_id,
     sender_id: row.sender_id,
     sender_username: row.sender_username,
     sender_avatar: row.sender_avatar,
-    content: row.content,
+    content: row._decryptedContent,
     reply_to_id: row.reply_to_id || null,
-    reply_content: row.reply_content || null,
+    reply_content: row.reply_content ? await decryptMessageContent(searchRoomId, row.reply_content) : null,
     reply_sender_username: row.reply_sender_username || null,
     reactions: reactionsByMsg[row.id] || [],
     status: row.status,
     created_at: row.created_at,
   })));
+  res.json(decryptedSearchResults);
 }));
 
 app.delete('/api/messages/:id', authMiddleware, requireUser, asyncHandler(async (req, res) => {
@@ -1726,16 +1831,17 @@ wss.on('connection', (ws) => {
             [replyToId]
           );
           if (replyMsg) {
-            replyContent = replyMsg.content;
+            replyContent = await decryptMessageContent(data.room_id, replyMsg.content);
             replySenderUsername = replyMsg.username;
           }
         }
 
+        const encryptedContent = await encryptMessageContent(data.room_id, String(data.content).trim());
         const message = await queryOne(
           `INSERT INTO ${TABLES.messages} (id, room_id, sender_id, content, reply_to_id, status)
            VALUES ($1, $2, $3, $4, $5, 'delivered')
            RETURNING *`,
-          [uuidv4(), data.room_id, ws.user.id, String(data.content).trim(), replyToId]
+          [uuidv4(), data.room_id, ws.user.id, encryptedContent, replyToId]
         );
         // Keep sender's last_read_at current so own messages don't trigger unread
         await query(
@@ -1749,7 +1855,7 @@ wss.on('connection', (ws) => {
           sender_id: message.sender_id,
           sender_username: freshUser.username,
           sender_avatar: freshUser.avatar_url,
-          content: message.content,
+          content: String(data.content).trim(), // Send plaintext over WSS (TLS-encrypted)
           reply_to_id: replyToId,
           reply_content: replyContent,
           reply_sender_username: replySenderUsername,
@@ -1893,6 +1999,20 @@ async function initDb() {
     `ALTER TABLE ${TABLES.rooms} ADD COLUMN IF NOT EXISTS message_retention_hours INT`
   );
 
+  // Add encryption_key column if it doesn't exist
+  await query(
+    `ALTER TABLE ${TABLES.rooms} ADD COLUMN IF NOT EXISTS encryption_key TEXT`
+  );
+
+  // Backfill encryption keys for existing rooms that don't have one
+  const roomsWithoutKey = await query(
+    `SELECT id FROM ${TABLES.rooms} WHERE encryption_key IS NULL`
+  );
+  for (const r of roomsWithoutKey) {
+    const encKey = generateEncryptedRoomKey();
+    await query(`UPDATE ${TABLES.rooms} SET encryption_key = $1 WHERE id = $2`, [encKey, r.id]);
+  }
+
   await query(
     `CREATE TABLE IF NOT EXISTS ${TABLES.roomMembers} (
       room_id TEXT NOT NULL REFERENCES ${TABLES.rooms}(id) ON DELETE CASCADE,
@@ -2004,6 +2124,7 @@ cron.schedule('0 * * * *', async () => {
 
 server.listen(PORT, async () => {
   console.log(`ChatSphere Node API running on http://localhost:${PORT}`);
+  initEncryptionKeys();
   const connected = await connectDatabase();
   if (!connected) {
     console.log(`Retrying database connection every ${DB_RETRY_INTERVAL_MS}ms`);

@@ -8,7 +8,6 @@ import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
-import { encryptMessage, hasRoomKey, generateRoomKey } from '../lib/crypto';
 import { formatTime, getRoomAvatar, getConversationDisplayName, getParticipantLabel } from '../lib/utils';
 import type { Message } from '../types';
 import { useDmVoiceCall } from '../hooks/useDmVoiceCall';
@@ -55,10 +54,6 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
 
   useEffect(() => {
     if (currentRoom) {
-      // Auto-enable E2E: generate key if none exists
-      if (!hasRoomKey(currentRoom.id)) {
-        generateRoomKey(currentRoom.id);
-      }
       loadMessages(currentRoom.id);
       setMessageSearch('');
       setSearchedMessages([]);
@@ -117,10 +112,9 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
     }, 2000);
   }, [currentRoom?.id, user.username, ws]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!input.trim() || !currentRoom) return;
-    const content = await encryptMessage(currentRoom.id, input.trim());
-    ws.sendMessage(currentRoom.id, content, replyingTo?.id);
+    ws.sendMessage(currentRoom.id, input.trim(), replyingTo?.id);
     ws.sendStopTyping(currentRoom.id);
     setInput('');
     setReplyingTo(null);
