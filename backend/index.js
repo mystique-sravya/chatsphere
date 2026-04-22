@@ -227,7 +227,9 @@ function initEncryptionKeys() {
     });
     rsaPublicKey = publicKey;
     rsaPrivateKey = privateKey;
-    console.log('⚠️  Auto-generated RSA keypair (set RSA_PRIVATE_KEY & RSA_PUBLIC_KEY env vars for persistence)');
+    console.log('⚠️  Auto-generated RSA keypair — set these env vars on your server for persistence:');
+    console.log('RSA_PUBLIC_KEY=' + JSON.stringify(publicKey));
+    console.log('RSA_PRIVATE_KEY=' + JSON.stringify(privateKey));
   }
 }
 
@@ -241,11 +243,15 @@ function generateEncryptedRoomKey() {
 }
 
 function decryptRoomKey(encryptedKeyB64) {
-  const encrypted = Buffer.from(encryptedKeyB64, 'base64');
-  return crypto.privateDecrypt(
-    { key: rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
-    encrypted
-  );
+  try {
+    const encrypted = Buffer.from(encryptedKeyB64, 'base64');
+    return crypto.privateDecrypt(
+      { key: rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+      encrypted
+    );
+  } catch {
+    return null; // Key was encrypted with a different RSA keypair
+  }
 }
 
 function encryptContent(aesKeyBuf, plaintext) {
@@ -280,6 +286,14 @@ async function getRoomAesKey(roomId) {
   const room = await queryOne(`SELECT encryption_key FROM ${TABLES.rooms} WHERE id = $1`, [roomId]);
   if (!room?.encryption_key) return null;
   const aesKey = decryptRoomKey(room.encryption_key);
+  if (!aesKey) {
+    // RSA keypair changed — re-encrypt with current keypair
+    const newEncKey = generateEncryptedRoomKey();
+    await query(`UPDATE ${TABLES.rooms} SET encryption_key = $1 WHERE id = $2`, [newEncKey, roomId]);
+    const freshKey = decryptRoomKey(newEncKey);
+    roomKeyCache.set(roomId, freshKey);
+    return freshKey;
+  }
   roomKeyCache.set(roomId, aesKey);
   return aesKey;
 }
