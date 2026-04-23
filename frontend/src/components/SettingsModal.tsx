@@ -246,7 +246,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {/* DiceBear style picker */}
             <div>
               <label className="text-sm font-medium opacity-60 mb-2 block">Choose Avatar Style</label>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {diceBearStyles.map((style) => (
                   <button
                     key={style}
@@ -264,7 +264,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     <img
                       src={`https://api.dicebear.com/9.x/${style}/svg?seed=${user?.username}`}
                       alt={style}
-                      className="w-full rounded-lg"
+                      className="w-12 h-12 sm:w-full sm:h-auto rounded-lg mx-auto"
                     />
                   </button>
                 ))}

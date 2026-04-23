@@ -31,7 +31,7 @@ export default function RightPanel({ type, onClose, ws }: RightPanelProps) {
           <X className="w-5 h-5" />
         </button>
       </div>
-      {type === 'members' ? <MembersPanel /> : <FriendsPanel />}
+      {type === 'members' ? <MembersPanel /> : <FriendsPanel onClose={onClose} />}
     </motion.div>
   );
 }
@@ -94,7 +94,7 @@ function MembersPanel() {
   );
 }
 
-function FriendsPanel() {
+function FriendsPanel({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'friends' | 'requests' | 'search'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -137,6 +137,7 @@ function FriendsPanel() {
     try {
       const room = await createRoom(`DM-${friendId}`, 'dm', [friendId]);
       setCurrentRoom(room);
+      onClose();
     } catch {
       // Direct chat creation failed silently
     }

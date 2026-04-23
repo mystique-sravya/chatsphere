@@ -44,6 +44,9 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionPickerMsgId, setReactionPickerMsgId] = useState<string | null>(null);
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+  const [swipingMsgId, setSwipingMsgId] = useState<string | null>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const swipeTouchRef = useRef<{ startX: number; startY: number; msgId: string; isMine: boolean } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
@@ -478,6 +481,32 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
                 className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} group`}
                 onMouseEnter={() => setHoveredMsgId(msg.id)}
                 onMouseLeave={() => { if (reactionPickerMsgId !== msg.id) setHoveredMsgId(null); }}
+                onTouchStart={(e) => {
+                  const touch = e.touches[0];
+                  swipeTouchRef.current = { startX: touch.clientX, startY: touch.clientY, msgId: msg.id, isMine };
+                }}
+                onTouchMove={(e) => {
+                  if (!swipeTouchRef.current || swipeTouchRef.current.msgId !== msg.id) return;
+                  const touch = e.touches[0];
+                  const dx = touch.clientX - swipeTouchRef.current.startX;
+                  const dy = touch.clientY - swipeTouchRef.current.startY;
+                  if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll
+                  // Allow right swipe on others' messages, left swipe on own
+                  const validSwipe = isMine ? dx < -10 : dx > 10;
+                  if (validSwipe) {
+                    const clamped = isMine ? Math.max(dx, -80) : Math.min(dx, 80);
+                    setSwipingMsgId(msg.id);
+                    setSwipeX(clamped);
+                  }
+                }}
+                onTouchEnd={() => {
+                  if (swipeTouchRef.current?.msgId === msg.id && Math.abs(swipeX) > 50) {
+                    setReplyingTo(msg);
+                  }
+                  setSwipingMsgId(null);
+                  setSwipeX(0);
+                  swipeTouchRef.current = null;
+                }}
               >
                 {/* Username OUTSIDE the bubble */}
                 {!isMine && (
@@ -500,7 +529,29 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
                 </div>
               )}
                 {/* Message bubble */}
-                <div className="relative max-w-[75%]">
+                <div
+                  className={`relative max-w-[75%] flex items-center ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
+                  style={{
+                    transform: swipingMsgId === msg.id ? `translateX(${swipeX}px)` : undefined,
+                    transition: swipingMsgId === msg.id ? 'none' : 'transform 0.2s ease-out',
+                  }}
+                >
+                  {/* Swipe reply indicator */}
+                  {swipingMsgId === msg.id && Math.abs(swipeX) > 20 && (
+                    <div className={`absolute ${isMine ? 'right-full mr-2' : 'left-full ml-2'} flex items-center`}>
+                      <Reply className={`w-5 h-5 ${Math.abs(swipeX) > 50 ? 'text-primary-400' : 'opacity-40'} transition-colors`} />
+                    </div>
+                  )}
+
+                  {/* Three-dot button — visible on mobile */}
+                  <button
+                    onClick={() => setHoveredMsgId(hoveredMsgId === msg.id ? null : msg.id)}
+                    className={`lg:hidden p-1 rounded-full opacity-40 hover:opacity-80 active:opacity-100 transition-opacity shrink-0 ${isMine ? 'mr-1' : 'ml-1 order-2'}`}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  <div className="min-w-0 flex-1">
                   <div
                     className={`rounded-2xl px-4 py-2.5 ${
                       isMine
@@ -551,9 +602,10 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
                     </div>
                   )}
 
+                  </div>{/* close min-w-0 flex-1 */}
                 </div>
 
-                {/* Hover actions BELOW the bubble */}
+                {/* Hover/tap actions BELOW the bubble */}
                 {hoveredMsgId === msg.id && (
                   <div className={`mt-1 flex flex-col gap-1 ${isMine ? 'items-end' : 'items-start'}`}>
                     <motion.div

@@ -40,14 +40,23 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
           <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
             <MessageCircle className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent flex-1">
             ChatSphere
           </h1>
+          {/* Mobile: user avatar in header */}
+          <button onClick={onOpenSettings} className="lg:hidden relative">
+            <img
+              src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+              alt={user.username}
+              className="w-9 h-9 rounded-full border border-white/20"
+            />
+            <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2.5 h-2.5" />
+          </button>
         </div>
       </div>
 
-      {/* User info */}
-      <div className="p-4 border-b border-white/10">
+      {/* User info — hidden on mobile, shown on desktop */}
+      <div className="hidden lg:block p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img
