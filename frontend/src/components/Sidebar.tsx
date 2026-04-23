@@ -34,8 +34,8 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
 
   return (
     <div className="h-[100dvh] w-screen lg:w-72 glass flex flex-col border-r border-white/10">
-      {/* Header */}
-      <div className="p-4 border-b border-white/10">
+      {/* Header — frosted glass */}
+      <div className="glass-header p-4 border-b border-white/10 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
             <MessageCircle className="w-6 h-6 text-white" />
@@ -112,7 +112,7 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
               }
               onSelectRoom(room);
             }}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left ${
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left tap-highlight ${
               currentRoom?.id === room.id
                 ? 'bg-primary-500/20 border border-primary-500/30'
                 : 'hover:bg-white/5'
@@ -151,8 +151,8 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
         )}
       </div>
 
-      {/* Bottom actions */}
-      <div className="p-3 border-t border-white/10 flex gap-2">
+      {/* Bottom actions — safe area */}
+      <div className="p-3 border-t border-white/10 flex gap-2" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         {user.is_admin && (
           <a href="/admin" className="glass-button-secondary px-3 py-2 text-sm flex items-center gap-2">
             <Crown className="w-4 h-4 text-yellow-500" /> Admin

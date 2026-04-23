@@ -19,14 +19,15 @@ interface RightPanelProps {
 export default function RightPanel({ type, onClose, ws }: RightPanelProps) {
   return (
     <motion.div
-      initial={{ x: 50, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 50, opacity: 0 }}
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 28, stiffness: 300 }}
       className="fixed right-0 top-0 z-50 h-[100dvh] w-screen max-w-[92vw] glass border-l border-white/10 flex flex-col sm:max-w-80 lg:static lg:z-auto lg:w-80"
     >
-      <div className="p-4 border-b border-white/10 flex items-center justify-between">
+      <div className="glass-header p-4 border-b border-white/10 flex items-center justify-between sticky top-0 z-10">
         <h3 className="font-semibold">{type === 'members' ? 'Chat Participants' : 'Friends'}</h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg">
+        <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg tap-highlight">
           <X className="w-5 h-5" />
         </button>
       </div>

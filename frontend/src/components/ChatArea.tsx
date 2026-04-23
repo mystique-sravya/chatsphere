@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Menu, Users, Trash2, DoorOpen, MoreVertical, Check, CheckCheck, Link2, Timer,
-  Reply, Smile, X, Search, Phone, PhoneOff, Mic, MicOff, Shield,
+  Reply, Smile, X, Search, Phone, PhoneOff, Mic, MicOff, Shield, ChevronLeft,
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { useAuthStore } from '../stores/authStore';
@@ -252,10 +252,10 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
 
   return (
     <div className="flex-1 flex flex-col h-[100dvh] min-w-0">
-      {/* Header */}
-      <div className="glass border-b border-white/10 px-4 py-3 flex items-center gap-3">
-        <button onClick={onMenuClick} className="lg:hidden p-2 hover:bg-white/10 rounded-xl">
-          <Menu className="w-5 h-5" />
+      {/* Header — frosted glass on mobile */}
+      <div className="glass-header border-b border-white/10 px-3 py-2.5 lg:px-4 lg:py-3 flex items-center gap-2 lg:gap-3 sticky top-0 z-20">
+        <button onClick={onMenuClick} className="lg:hidden p-1.5 -ml-1 hover:bg-white/10 rounded-xl tap-highlight">
+          <ChevronLeft className="w-6 h-6" />
         </button>
         <img
           src={getRoomAvatar(`${currentRoom.type}-${currentRoom.name}`, currentRoom.type)}
@@ -406,26 +406,53 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
 
       <AnimatePresence>
         {showMenu && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4"
-            onClick={() => setShowMenu(false)}
-          >
-            <div className="flex justify-end">
+          <>
+            {/* Desktop: dropdown card */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[90] hidden lg:block"
+              onClick={() => setShowMenu(false)}
+            >
+              <div className="flex justify-end px-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -12, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -12, scale: 0.96 }}
+                  transition={{ duration: 0.18 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-16 w-full max-w-xs glass-card p-2 shadow-2xl"
+                >
+                  {chatMenuItems}
+                </motion.div>
+              </div>
+            </motion.div>
+
+            {/* Mobile: bottom sheet */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[90] bottom-sheet-overlay lg:hidden"
+              onClick={() => setShowMenu(false)}
+            >
               <motion.div
-                initial={{ opacity: 0, y: -12, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.96 }}
-                transition={{ duration: 0.18 }}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
                 onClick={(e) => e.stopPropagation()}
-                className="mt-16 w-full max-w-xs glass-card p-2 shadow-2xl"
+                className="absolute bottom-0 left-0 right-0 bottom-sheet border-t border-white/10 shadow-2xl"
+                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
               >
-                {chatMenuItems}
+                <div className="bottom-sheet-handle" />
+                <div className="p-2">
+                  {chatMenuItems}
+                </div>
               </motion.div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
@@ -612,8 +639,8 @@ export default function ChatArea({ ws, onMenuClick, onToggleMembers }: ChatAreaP
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-white/10">
+      {/* Input — safe area padding on mobile */}
+      <div className="p-3 lg:p-4 border-t border-white/10" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         {/* Reply preview */}
         {replyingTo && (
           <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">

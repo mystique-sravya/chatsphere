@@ -23,12 +23,18 @@ html, body, #root {
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   @apply transition-colors duration-300;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+  /* iOS safe areas */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 body.dark {
@@ -102,4 +108,109 @@ body.light {
 .online-dot::after {
   content: '';
   @apply absolute inset-0 rounded-full bg-green-500 animate-ping;
+}
+
+/* ─── Mobile Premium Enhancements ─────────────────────────── */
+
+/* Frosted glass header bar (iOS-style) */
+.glass-header {
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.light .glass-header {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* iOS-style slide transitions */
+@media (max-width: 1023px) {
+  .mobile-slide-enter {
+    animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+
+  .mobile-slide-exit {
+    animation: slideOutRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+
+  @keyframes slideOutRight {
+    from { transform: translateX(0); }
+    to   { transform: translateX(100%); }
+  }
+
+  /* Hide scrollbars on mobile for native feel */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  * {
+    scrollbar-width: none;
+  }
+}
+
+/* Tap feedback for interactive elements on mobile */
+@media (hover: none) {
+  .tap-highlight {
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+  .tap-highlight:active {
+    transform: scale(0.97);
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Bottom sheet overlay */
+.bottom-sheet-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Bottom sheet panel */
+.bottom-sheet {
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top-left-radius: 1.25rem;
+  border-top-right-radius: 1.25rem;
+}
+
+.light .bottom-sheet {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Bottom sheet handle */
+.bottom-sheet-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 8px auto 4px;
+}
+
+.light .bottom-sheet-handle {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Pull-to-refresh spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.pull-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Swipe-back edge indicator */
+.swipe-edge {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  z-index: 60;
 }
