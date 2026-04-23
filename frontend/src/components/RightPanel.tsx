@@ -59,7 +59,7 @@ function MembersPanel() {
                   alt={m.username}
                   className="w-9 h-9 rounded-full"
                 />
-                <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2.5 h-2.5" />
+                <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2 h-2" />
               </div>
               <div>
                 <p className="text-sm font-medium">{m.username}</p>
@@ -440,7 +440,7 @@ function FriendItem({
           className="w-9 h-9 rounded-full"
         />
         {friend.status === 'online' && (
-          <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2.5 h-2.5" />
+          <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2 h-2" />
         )}
       </div>
       <div

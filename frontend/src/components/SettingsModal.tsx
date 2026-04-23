@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Moon, Sun, User, Bell, Palette, Lock } from 'lucide-react';
+import { Camera, Link2, Moon, RotateCcw, Sun, Upload, User, Bell, Palette, Lock, X } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/utils';
@@ -18,12 +18,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
+  const [showAvatarActions, setShowAvatarActions] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'appearance' | 'notifications'>('profile');
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingAvatarChange, setPendingAvatarChange] = useState<null | {
     title: string;
     description: string;
@@ -91,6 +93,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleResetAvatar = async () => {
+    setShowAvatarActions(false);
     setPendingAvatarChange({
       title: 'Reset Profile Picture',
       description: 'Your current profile picture will be replaced with the default DiceBear avatar.',
@@ -101,6 +104,16 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         avatar_style: 'lorelei-neutral',
       },
     });
+  };
+
+  const handleAvatarActionUpload = () => {
+    setShowAvatarActions(false);
+    avatarInputRef.current?.click();
+  };
+
+  const handleOpenAdvancedAvatarUrl = () => {
+    setShowAvatarActions(false);
+    setShowAdvancedAvatarUrl(true);
   };
 
   const handleChangePassword = async () => {
@@ -225,23 +238,83 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         {activeTab === 'profile' && (
           <div className="space-y-4">
             {/* Current avatar */}
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <img
-                src={user?.avatar_url || `https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=${user?.username}`}
-                alt="Avatar"
-                className="w-16 h-16 rounded-2xl"
-              />
-              <div className="min-w-0">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowAvatarActions((current) => !current)}
+                className="group relative shrink-0 rounded-[1.4rem] focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                aria-label="Change profile picture"
+              >
+                <img
+                  src={user?.avatar_url || `https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=${user?.username}`}
+                  alt="Avatar"
+                  className="w-20 h-20 rounded-[1.4rem] object-cover"
+                />
+                <div className="absolute inset-0 rounded-[1.4rem] bg-black/0 transition-colors group-hover:bg-black/25 group-focus-visible:bg-black/25" />
+                <div className="absolute inset-x-0 bottom-2 flex justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white">
+                    <Camera className="w-3 h-3" />
+                    Change
+                  </span>
+                </div>
+              </button>
+              <div className="min-w-0 flex-1">
                 <p className="font-medium">{user?.username}</p>
                 <p className="text-sm opacity-50">Username-based account</p>
                 <button
-                  onClick={handleResetAvatar}
+                  type="button"
+                  onClick={() => setShowAvatarActions((current) => !current)}
                   className="text-xs text-primary-400 hover:text-primary-300 mt-1"
                 >
-                  Reset to DiceBear
+                  Change profile picture
                 </button>
+                <p className="text-xs opacity-40 mt-1">Tap the current avatar to upload, reset, or use an image URL.</p>
               </div>
             </div>
+
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+
+            <AnimatePresence initial={false}>
+              {showAvatarActions && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="glass rounded-2xl p-2 space-y-1"
+                >
+                  <button
+                    type="button"
+                    onClick={handleAvatarActionUpload}
+                    className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-left hover:bg-white/10"
+                  >
+                    <Upload className="w-4 h-4 text-primary-400" />
+                    <span>Upload from device</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetAvatar}
+                    className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-left hover:bg-white/10"
+                  >
+                    <RotateCcw className="w-4 h-4 text-primary-400" />
+                    <span>Reset to DiceBear</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenAdvancedAvatarUrl}
+                    className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-left hover:bg-white/10"
+                  >
+                    <Link2 className="w-4 h-4 text-primary-400" />
+                    <span>Use image URL</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* DiceBear style picker */}
             <div>
@@ -271,17 +344,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium opacity-60 mb-1 block">Upload Profile Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                className="block w-full text-sm opacity-70 file:mb-2 file:mr-0 sm:file:mb-0 sm:file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:text-white hover:file:bg-white/20"
-              />
-              <p className="text-xs opacity-40 mt-1">Use a JPG, PNG, or WebP image up to 2 MB.</p>
-            </div>
-
             <div className="glass rounded-xl p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -308,6 +370,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   <p className="text-xs opacity-40">
                     This must be a direct image file URL, not a Google search page or website link.
                   </p>
+                  <p className="text-xs opacity-40">Use a JPG, PNG, or WebP image up to 2 MB when uploading from your device.</p>
                 </div>
               )}
             </div>

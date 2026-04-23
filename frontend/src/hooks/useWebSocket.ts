@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { useFriendStore } from '../stores/friendStore';
@@ -8,6 +8,8 @@ import { emitVoiceSocketEvent } from '../lib/voiceEvents';
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const pendingQueue = useRef<Record<string, unknown>[]>([]);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const token = useAuthStore((s) => s.token);
   const addMessage = useChatStore((s) => s.addMessage);
   const setTypingUser = useChatStore((s) => s.setTypingUser);
@@ -16,8 +18,29 @@ export function useWebSocket() {
   const updateMessageStatus = useChatStore((s) => s.updateMessageStatus);
   const markRoomUnread = useChatStore((s) => s.markRoomUnread);
 
+  const scheduleReconnect = useCallback(() => {
+    if (reconnectTimerRef.current || !useAuthStore.getState().token) {
+      return;
+    }
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      setConnectionAttempt((current) => current + 1);
+    }, 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      wsRef.current = null;
+      pendingQueue.current = [];
+      return;
+    }
 
     const apiUrl = import.meta.env.VITE_API_URL || '';
     let wsUrl: string;
@@ -34,6 +57,13 @@ export function useWebSocket() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      const currentRoom = useChatStore.getState().currentRoom;
+      const username = useAuthStore.getState().user?.username;
+
+      if (currentRoom && username) {
+        ws.send(JSON.stringify({ type: 'join_room', room_id: currentRoom.id, username }));
+      }
+
       // Flush any messages queued while disconnected
       while (pendingQueue.current.length > 0) {
         const msg = pendingQueue.current.shift()!;
@@ -148,20 +178,24 @@ export function useWebSocket() {
       }
     };
 
+    ws.onerror = () => {
+      ws.close();
+    };
+
     ws.onclose = () => {
-      // Reconnect after 3 seconds
-      setTimeout(() => {
-        if (useAuthStore.getState().token) {
-          // Force re-render to reconnect
-          useAuthStore.setState({});
-        }
-      }, 3000);
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
+      scheduleReconnect();
     };
 
     return () => {
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
       ws.close();
     };
-  }, [token, addMessage, setTypingUser, removeTypingUser, setActiveRoomUsers, updateMessageStatus, markRoomUnread]);
+  }, [token, connectionAttempt, addMessage, setTypingUser, removeTypingUser, setActiveRoomUsers, updateMessageStatus, markRoomUnread, scheduleReconnect]);
 
   const send = useCallback((data: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

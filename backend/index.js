@@ -263,7 +263,7 @@ function encryptContent(aesKeyBuf, plaintext) {
   return Buffer.concat([iv, authTag, encrypted]).toString('base64');
 }
 
-function decryptContent(aesKeyBuf, ciphertextB64) {
+function decryptContent(aesKeyBuf, ciphertextB64, context = {}) {
   try {
     const buf = Buffer.from(ciphertextB64, 'base64');
     const iv = buf.subarray(0, 12);
@@ -272,8 +272,18 @@ function decryptContent(aesKeyBuf, ciphertextB64) {
     const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuf, iv);
     decipher.setAuthTag(authTag);
     return decipher.update(ciphertext) + decipher.final('utf8');
-  } catch {
+  } catch (error) {
     // If decryption fails (e.g. old unencrypted message), return as-is
+    console.error('Message decryption failed; returning stored value as fallback', {
+      room_id: context.roomId || null,
+      ciphertext_length: typeof ciphertextB64 === 'string' ? ciphertextB64.length : 0,
+      ciphertext_preview: typeof ciphertextB64 === 'string' ? ciphertextB64.slice(0, 48) : null,
+      aes_key_length: Buffer.isBuffer(aesKeyBuf) ? aesKeyBuf.length : null,
+      looks_like_encrypted_payload: typeof ciphertextB64 === 'string' && ciphertextB64.length >= 40,
+      error_message: error instanceof Error ? error.message : String(error),
+      error_name: error instanceof Error ? error.name : 'UnknownError',
+    });
+
     return ciphertextB64;
   }
 }
@@ -307,7 +317,7 @@ async function encryptMessageContent(roomId, plaintext) {
 async function decryptMessageContent(roomId, ciphertext) {
   const aesKey = await getRoomAesKey(roomId);
   if (!aesKey) return ciphertext;
-  return decryptContent(aesKey, ciphertext);
+  return decryptContent(aesKey, ciphertext, { roomId });
 }
 
 async function buildRoomResponse(roomRow, includeMembers = false) {

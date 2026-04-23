@@ -50,7 +50,7 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
               alt={user.username}
               className="w-9 h-9 rounded-full border border-white/20"
             />
-            <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2.5 h-2.5" />
+            <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2 h-2" />
           </button>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function Sidebar({ onCreateRoom, onOpenSettings, onSelectRoom, on
               alt={user.username}
               className="w-10 h-10 rounded-full"
             />
-            <div className="absolute -bottom-0.5 -right-0.5 online-dot w-3 h-3" />
+            <div className="absolute -bottom-0.5 -right-0.5 online-dot w-2.5 h-2.5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium truncate">{user.username}</p>

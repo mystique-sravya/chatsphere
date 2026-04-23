@@ -30,6 +30,20 @@ interface ChatState {
   updateReaction: (messageId: string, roomId: string, emoji: string, userId: string, username: string, action: 'added' | 'removed') => void;
 }
 
+function mergeMessages(...messageGroups: Message[][]): Message[] {
+  const merged = new Map<string, Message>();
+
+  for (const group of messageGroups) {
+    for (const message of group) {
+      merged.set(message.id, message);
+    }
+  }
+
+  return [...merged.values()].sort((left, right) =>
+    new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+  );
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   rooms: [],
   roomsLoading: true,
@@ -87,16 +101,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   }),
 
   loadMessages: async (roomId) => {
-    const messages = await api.getMessages(roomId) as Message[];
+    const fetchedMessages = await api.getMessages(roomId) as Message[];
     set((state) => ({
-      messages,
+      messages: state.currentRoom?.id === roomId
+        ? mergeMessages(fetchedMessages, state.messagesByRoom[roomId] || [], state.messages)
+        : state.messages,
       unreadRooms: {
         ...state.unreadRooms,
         [roomId]: false,
       },
       messagesByRoom: {
         ...state.messagesByRoom,
-        [roomId]: messages,
+        [roomId]: mergeMessages(fetchedMessages, state.messagesByRoom[roomId] || []),
       },
     }));
   },
